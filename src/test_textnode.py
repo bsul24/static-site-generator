@@ -1,6 +1,13 @@
 import unittest
 
-from textnode import TextNode, TextType, split_nodes_delimiter, text_node_to_html_node
+from textnode import (
+    TextNode,
+    TextType,
+    extract_markdown_images,
+    extract_markdown_links,
+    split_nodes_delimiter,
+    text_node_to_html_node,
+)
 
 
 class TestTextNode(unittest.TestCase):
@@ -288,6 +295,105 @@ class TestSplitNodesDelimiter(unittest.TestCase):
             ],
             new_nodes,
         )
+
+
+class TestExtractMarkdownImages(unittest.TestCase):
+    def test_single_image(self):
+        text = "Here is ![a cat](https://example.com/cat.png)"
+        expected = [("a cat", "https://example.com/cat.png")]
+        self.assertEqual(extract_markdown_images(text), expected)
+
+    def test_multiple_images(self):
+        text = "First ![cat](cat.png) and second ![dog](dog.jpg)"
+        expected = [
+            ("cat", "cat.png"),
+            ("dog", "dog.jpg"),
+        ]
+        self.assertEqual(extract_markdown_images(text), expected)
+
+    def test_no_images(self):
+        text = "This is plain text with no images."
+        self.assertEqual(extract_markdown_images(text), [])
+
+    def test_ignore_regular_links(self):
+        text = "Visit [Google](https://google.com)"
+        self.assertEqual(extract_markdown_images(text), [])
+
+    def test_empty_alt_text(self):
+        text = "![](image.png)"
+        expected = [("", "image.png")]
+        self.assertEqual(extract_markdown_images(text), expected)
+
+    def test_image_with_special_characters(self):
+        text = "![My cool image!](https://example.com/a-b_c.png)"
+        expected = [("My cool image!", "https://example.com/a-b_c.png")]
+        self.assertEqual(extract_markdown_images(text), expected)
+
+    def test_unclosed_image(self):
+        text = "![cat](cat.png"
+        self.assertEqual(extract_markdown_images(text), [])
+
+    def test_nested_brackets(self):
+        text = "![A [cute] cat](cat.png)"
+        self.assertEqual(extract_markdown_images(text), [])
+
+
+class TestExtractMarkdownLinks(unittest.TestCase):
+    def test_single_link(self):
+        text = "Visit [Google](https://google.com)"
+        expected = [("Google", "https://google.com")]
+        self.assertEqual(extract_markdown_links(text), expected)
+
+    def test_multiple_links(self):
+        text = "Visit [Google](https://google.com) or [GitHub](https://github.com)"
+        expected = [
+            ("Google", "https://google.com"),
+            ("GitHub", "https://github.com"),
+        ]
+        self.assertEqual(extract_markdown_links(text), expected)
+
+    def test_no_links(self):
+        text = "This is plain text without links."
+        self.assertEqual(extract_markdown_links(text), [])
+
+    def test_ignore_images(self):
+        text = "Here is ![cat](cat.png)"
+        self.assertEqual(extract_markdown_links(text), [])
+
+    def test_mixed_links_and_images(self):
+        text = (
+            "Visit [Google](https://google.com), "
+            "see ![cat](cat.png), "
+            "or visit [GitHub](https://github.com)"
+        )
+        expected = [
+            ("Google", "https://google.com"),
+            ("GitHub", "https://github.com"),
+        ]
+        self.assertEqual(extract_markdown_links(text), expected)
+
+    def test_empty_link_text(self):
+        text = "[](https://example.com)"
+        expected = [("", "https://example.com")]
+        self.assertEqual(extract_markdown_links(text), expected)
+
+    def test_unclosed_link(self):
+        text = "[Google](https://google.com"
+        self.assertEqual(extract_markdown_links(text), [])
+
+    def test_nested_brackets(self):
+        text = "[A [nested] link](https://example.com)"
+        self.assertEqual(extract_markdown_links(text), [])
+
+    def test_parentheses_in_url(self):
+        text = "[Docs](https://example.com/a(b))"
+        self.assertEqual(extract_markdown_links(text), [])
+
+    def test_extract_markdown_images(self):
+        matches = extract_markdown_images(
+            "This is text with an ![image](https://i.imgur.com/zjjcJKZ.png)"
+        )
+        self.assertListEqual([("image", "https://i.imgur.com/zjjcJKZ.png")], matches)
 
 
 if __name__ == "__main__":

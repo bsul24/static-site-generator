@@ -1,3 +1,4 @@
+import re
 from enum import Enum
 
 from htmlnode import LeafNode
@@ -87,3 +88,11 @@ def split_nodes_delimiter(
         new_nodes.extend(result_nodes)
 
     return new_nodes
+
+
+def extract_markdown_images(text: str):
+    return re.findall(r"!\[([^\[\]]*)\]\(([^\(\)]*)\)", text)
+
+
+def extract_markdown_links(text: str):
+    return re.findall(r"(?<!!)\[([^\[\]]*)\]\(([^\(\)]*)\)", text)
