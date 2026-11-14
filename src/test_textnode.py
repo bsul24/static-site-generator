@@ -9,6 +9,7 @@ from textnode import (
     split_nodes_image,
     split_nodes_link,
     text_node_to_html_node,
+    text_to_textnodes,
 )
 
 
@@ -800,6 +801,169 @@ class TestSplitNodesLink(unittest.TestCase):
         ]
 
         self.assertEqual(result, expected)
+
+
+class TestTextToTextNodes(unittest.TestCase):
+    def test_plain_text(self):
+        text = "This is plain text."
+
+        expected = [
+            TextNode("This is plain text.", TextType.TEXT),
+        ]
+
+        self.assertEqual(text_to_textnodes(text), expected)
+
+    def test_bold(self):
+        text = "This is **bold** text."
+
+        expected = [
+            TextNode("This is ", TextType.TEXT),
+            TextNode("bold", TextType.BOLD),
+            TextNode(" text.", TextType.TEXT),
+        ]
+
+        self.assertEqual(text_to_textnodes(text), expected)
+
+    def test_italic(self):
+        text = "This is _italic_ text."
+
+        expected = [
+            TextNode("This is ", TextType.TEXT),
+            TextNode("italic", TextType.ITALIC),
+            TextNode(" text.", TextType.TEXT),
+        ]
+
+        self.assertEqual(text_to_textnodes(text), expected)
+
+    def test_code(self):
+        text = "Use `print('hello')` to print."
+
+        expected = [
+            TextNode("Use ", TextType.TEXT),
+            TextNode("print('hello')", TextType.CODE),
+            TextNode(" to print.", TextType.TEXT),
+        ]
+
+        self.assertEqual(text_to_textnodes(text), expected)
+
+    def test_image(self):
+        text = "Here is ![a cat](cat.png) for you."
+
+        expected = [
+            TextNode("Here is ", TextType.TEXT),
+            TextNode("a cat", TextType.IMAGE, "cat.png"),
+            TextNode(" for you.", TextType.TEXT),
+        ]
+
+        self.assertEqual(text_to_textnodes(text), expected)
+
+    def test_link(self):
+        text = "Visit [Google](https://google.com) today."
+
+        expected = [
+            TextNode("Visit ", TextType.TEXT),
+            TextNode("Google", TextType.LINK, "https://google.com"),
+            TextNode(" today.", TextType.TEXT),
+        ]
+
+        self.assertEqual(text_to_textnodes(text), expected)
+
+    def test_all_types(self):
+        text = (
+            "This is **text** with an _italic_ word "
+            "and a `code block` and an "
+            "![obi wan image](https://i.imgur.com/fJRm4Vk.jpeg) "
+            "and a [link](https://boot.dev)"
+        )
+
+        expected = [
+            TextNode("This is ", TextType.TEXT),
+            TextNode("text", TextType.BOLD),
+            TextNode(" with an ", TextType.TEXT),
+            TextNode("italic", TextType.ITALIC),
+            TextNode(" word and a ", TextType.TEXT),
+            TextNode("code block", TextType.CODE),
+            TextNode(" and an ", TextType.TEXT),
+            TextNode(
+                "obi wan image",
+                TextType.IMAGE,
+                "https://i.imgur.com/fJRm4Vk.jpeg",
+            ),
+            TextNode(" and a ", TextType.TEXT),
+            TextNode("link", TextType.LINK, "https://boot.dev"),
+        ]
+
+        self.assertEqual(text_to_textnodes(text), expected)
+
+    def test_adjacent_formatted_text(self):
+        text = "**bold**_italic_`code`"
+
+        expected = [
+            TextNode("bold", TextType.BOLD),
+            TextNode("italic", TextType.ITALIC),
+            TextNode("code", TextType.CODE),
+        ]
+
+        self.assertEqual(text_to_textnodes(text), expected)
+
+    def test_multiple_same_format(self):
+        text = "**first** and **second** and **third**"
+
+        expected = [
+            TextNode("first", TextType.BOLD),
+            TextNode(" and ", TextType.TEXT),
+            TextNode("second", TextType.BOLD),
+            TextNode(" and ", TextType.TEXT),
+            TextNode("third", TextType.BOLD),
+        ]
+
+        self.assertEqual(text_to_textnodes(text), expected)
+
+    def test_multiple_images_and_links(self):
+        text = (
+            "![cat](cat.png) and [Google](https://google.com) "
+            "and ![dog](dog.png) and [GitHub](https://github.com)"
+        )
+
+        expected = [
+            TextNode("cat", TextType.IMAGE, "cat.png"),
+            TextNode(" and ", TextType.TEXT),
+            TextNode("Google", TextType.LINK, "https://google.com"),
+            TextNode(" and ", TextType.TEXT),
+            TextNode("dog", TextType.IMAGE, "dog.png"),
+            TextNode(" and ", TextType.TEXT),
+            TextNode("GitHub", TextType.LINK, "https://github.com"),
+        ]
+
+        self.assertEqual(text_to_textnodes(text), expected)
+
+    def test_repeated_identical_links(self):
+        text = "[Google](https://google.com) and [Google](https://google.com)"
+
+        expected = [
+            TextNode("Google", TextType.LINK, "https://google.com"),
+            TextNode(" and ", TextType.TEXT),
+            TextNode("Google", TextType.LINK, "https://google.com"),
+        ]
+
+        self.assertEqual(text_to_textnodes(text), expected)
+
+    def test_repeated_identical_images(self):
+        text = "![cat](cat.png) and ![cat](cat.png)"
+
+        expected = [
+            TextNode("cat", TextType.IMAGE, "cat.png"),
+            TextNode(" and ", TextType.TEXT),
+            TextNode("cat", TextType.IMAGE, "cat.png"),
+        ]
+
+        self.assertEqual(text_to_textnodes(text), expected)
+
+    def test_unmatched_bold_delimiter(self):
+        text = "This is **unfinished bold text"
+
+        with self.assertRaises(ValueError):
+            text_to_textnodes(text)
 
 
 if __name__ == "__main__":
