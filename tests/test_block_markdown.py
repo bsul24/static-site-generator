@@ -86,9 +86,9 @@ This is the second line.
 This is the third line."""
 
         expected = [
-            "This is the first line.\n"
-            "This is the second line.\n"
-            "This is the third line.",
+            """This is the first line.
+This is the second line.
+This is the third line."""
         ]
 
         self.assertEqual(markdown_to_blocks(markdown), expected)
