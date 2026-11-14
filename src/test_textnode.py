@@ -6,6 +6,8 @@ from textnode import (
     extract_markdown_images,
     extract_markdown_links,
     split_nodes_delimiter,
+    split_nodes_image,
+    split_nodes_link,
     text_node_to_html_node,
 )
 
@@ -394,6 +396,410 @@ class TestExtractMarkdownLinks(unittest.TestCase):
             "This is text with an ![image](https://i.imgur.com/zjjcJKZ.png)"
         )
         self.assertListEqual([("image", "https://i.imgur.com/zjjcJKZ.png")], matches)
+
+
+class TestSplitNodesImage(unittest.TestCase):
+    def test_single_image(self):
+        node = TextNode(
+            "This is an ![image](https://example.com/image.png) in text",
+            TextType.TEXT,
+        )
+
+        result = split_nodes_image([node])
+
+        expected = [
+            TextNode("This is an ", TextType.TEXT),
+            TextNode(
+                "image",
+                TextType.IMAGE,
+                "https://example.com/image.png",
+            ),
+            TextNode(" in text", TextType.TEXT),
+        ]
+
+        self.assertEqual(result, expected)
+
+    def test_multiple_images(self):
+        node = TextNode(
+            "First ![cat](cat.png) and second ![dog](dog.png) end",
+            TextType.TEXT,
+        )
+
+        result = split_nodes_image([node])
+
+        expected = [
+            TextNode("First ", TextType.TEXT),
+            TextNode("cat", TextType.IMAGE, "cat.png"),
+            TextNode(" and second ", TextType.TEXT),
+            TextNode("dog", TextType.IMAGE, "dog.png"),
+            TextNode(" end", TextType.TEXT),
+        ]
+
+        self.assertEqual(result, expected)
+
+    def test_no_images(self):
+        node = TextNode(
+            "Just some regular text.",
+            TextType.TEXT,
+        )
+
+        result = split_nodes_image([node])
+
+        self.assertEqual(result, [node])
+
+    def test_image_at_beginning(self):
+        node = TextNode(
+            "![cat](cat.png) is a picture of a cat",
+            TextType.TEXT,
+        )
+
+        result = split_nodes_image([node])
+
+        expected = [
+            TextNode("cat", TextType.IMAGE, "cat.png"),
+            TextNode(" is a picture of a cat", TextType.TEXT),
+        ]
+
+        self.assertEqual(result, expected)
+
+    def test_image_at_end(self):
+        node = TextNode(
+            "Here is a cat: ![cat](cat.png)",
+            TextType.TEXT,
+        )
+
+        result = split_nodes_image([node])
+
+        expected = [
+            TextNode("Here is a cat: ", TextType.TEXT),
+            TextNode("cat", TextType.IMAGE, "cat.png"),
+        ]
+
+        self.assertEqual(result, expected)
+
+    def test_only_image(self):
+        node = TextNode(
+            "![cat](cat.png)",
+            TextType.TEXT,
+        )
+
+        result = split_nodes_image([node])
+
+        expected = [
+            TextNode("cat", TextType.IMAGE, "cat.png"),
+        ]
+
+        self.assertEqual(result, expected)
+
+    def test_adjacent_images(self):
+        node = TextNode(
+            "![cat](cat.png)![dog](dog.png)",
+            TextType.TEXT,
+        )
+
+        result = split_nodes_image([node])
+
+        expected = [
+            TextNode("cat", TextType.IMAGE, "cat.png"),
+            TextNode("dog", TextType.IMAGE, "dog.png"),
+        ]
+
+        self.assertEqual(result, expected)
+
+    def test_multiple_input_nodes(self):
+        nodes = [
+            TextNode("First ![cat](cat.png)", TextType.TEXT),
+            TextNode("Some regular text", TextType.TEXT),
+            TextNode("Second ![dog](dog.png)", TextType.TEXT),
+        ]
+
+        result = split_nodes_image(nodes)
+
+        expected = [
+            TextNode("First ", TextType.TEXT),
+            TextNode("cat", TextType.IMAGE, "cat.png"),
+            TextNode("Some regular text", TextType.TEXT),
+            TextNode("Second ", TextType.TEXT),
+            TextNode("dog", TextType.IMAGE, "dog.png"),
+        ]
+
+        self.assertEqual(result, expected)
+
+    def test_preserve_existing_formatted_nodes(self):
+        nodes = [
+            TextNode("Already bold", TextType.BOLD),
+            TextNode("An ![image](image.png)", TextType.TEXT),
+            TextNode("Already italic", TextType.ITALIC),
+        ]
+
+        result = split_nodes_image(nodes)
+
+        expected = [
+            TextNode("Already bold", TextType.BOLD),
+            TextNode("An ", TextType.TEXT),
+            TextNode("image", TextType.IMAGE, "image.png"),
+            TextNode("Already italic", TextType.ITALIC),
+        ]
+
+        self.assertEqual(result, expected)
+
+    def test_ignore_regular_links(self):
+        node = TextNode(
+            "Visit [Google](https://google.com) and see ![cat](cat.png)",
+            TextType.TEXT,
+        )
+
+        result = split_nodes_image([node])
+
+        expected = [
+            TextNode(
+                "Visit [Google](https://google.com) and see ",
+                TextType.TEXT,
+            ),
+            TextNode("cat", TextType.IMAGE, "cat.png"),
+        ]
+
+        self.assertEqual(result, expected)
+
+    def test_empty_input(self):
+        result = split_nodes_image([])
+
+        self.assertEqual(result, [])
+
+
+class TestSplitNodesLink(unittest.TestCase):
+    def test_single_link(self):
+        node = TextNode(
+            "This is a [link](https://example.com) in text",
+            TextType.TEXT,
+        )
+
+        result = split_nodes_link([node])
+
+        expected = [
+            TextNode("This is a ", TextType.TEXT),
+            TextNode("link", TextType.LINK, "https://example.com"),
+            TextNode(" in text", TextType.TEXT),
+        ]
+
+        self.assertEqual(result, expected)
+
+    def test_multiple_links(self):
+        node = TextNode(
+            "Visit [Google](https://google.com) and [GitHub](https://github.com) today",
+            TextType.TEXT,
+        )
+
+        result = split_nodes_link([node])
+
+        expected = [
+            TextNode("Visit ", TextType.TEXT),
+            TextNode("Google", TextType.LINK, "https://google.com"),
+            TextNode(" and ", TextType.TEXT),
+            TextNode("GitHub", TextType.LINK, "https://github.com"),
+            TextNode(" today", TextType.TEXT),
+        ]
+
+        self.assertEqual(result, expected)
+
+    def test_no_links(self):
+        node = TextNode(
+            "Just some regular text.",
+            TextType.TEXT,
+        )
+
+        result = split_nodes_link([node])
+
+        self.assertEqual(result, [node])
+
+    def test_link_at_beginning(self):
+        node = TextNode(
+            "[Google](https://google.com) is a search engine",
+            TextType.TEXT,
+        )
+
+        result = split_nodes_link([node])
+
+        expected = [
+            TextNode("Google", TextType.LINK, "https://google.com"),
+            TextNode(" is a search engine", TextType.TEXT),
+        ]
+
+        self.assertEqual(result, expected)
+
+    def test_link_at_end(self):
+        node = TextNode(
+            "Visit [Google](https://google.com)",
+            TextType.TEXT,
+        )
+
+        result = split_nodes_link([node])
+
+        expected = [
+            TextNode("Visit ", TextType.TEXT),
+            TextNode("Google", TextType.LINK, "https://google.com"),
+        ]
+
+        self.assertEqual(result, expected)
+
+    def test_only_link(self):
+        node = TextNode(
+            "[Google](https://google.com)",
+            TextType.TEXT,
+        )
+
+        result = split_nodes_link([node])
+
+        expected = [
+            TextNode("Google", TextType.LINK, "https://google.com"),
+        ]
+
+        self.assertEqual(result, expected)
+
+    def test_adjacent_links(self):
+        node = TextNode(
+            "[Google](https://google.com)[GitHub](https://github.com)",
+            TextType.TEXT,
+        )
+
+        result = split_nodes_link([node])
+
+        expected = [
+            TextNode("Google", TextType.LINK, "https://google.com"),
+            TextNode("GitHub", TextType.LINK, "https://github.com"),
+        ]
+
+        self.assertEqual(result, expected)
+
+    def test_multiple_input_nodes(self):
+        nodes = [
+            TextNode("First [Google](https://google.com)", TextType.TEXT),
+            TextNode("Some regular text", TextType.TEXT),
+            TextNode("Second [GitHub](https://github.com)", TextType.TEXT),
+        ]
+
+        result = split_nodes_link(nodes)
+
+        expected = [
+            TextNode("First ", TextType.TEXT),
+            TextNode("Google", TextType.LINK, "https://google.com"),
+            TextNode("Some regular text", TextType.TEXT),
+            TextNode("Second ", TextType.TEXT),
+            TextNode("GitHub", TextType.LINK, "https://github.com"),
+        ]
+
+        self.assertEqual(result, expected)
+
+    def test_preserve_existing_formatted_nodes(self):
+        nodes = [
+            TextNode("Already bold", TextType.BOLD),
+            TextNode(
+                "Visit [Google](https://google.com)",
+                TextType.TEXT,
+            ),
+            TextNode("Already italic", TextType.ITALIC),
+        ]
+
+        result = split_nodes_link(nodes)
+
+        expected = [
+            TextNode("Already bold", TextType.BOLD),
+            TextNode("Visit ", TextType.TEXT),
+            TextNode("Google", TextType.LINK, "https://google.com"),
+            TextNode("Already italic", TextType.ITALIC),
+        ]
+
+        self.assertEqual(result, expected)
+
+    def test_ignore_images(self):
+        node = TextNode(
+            "See ![cat](cat.png) and visit [Google](https://google.com)",
+            TextType.TEXT,
+        )
+
+        result = split_nodes_link([node])
+
+        expected = [
+            TextNode(
+                "See ![cat](cat.png) and visit ",
+                TextType.TEXT,
+            ),
+            TextNode("Google", TextType.LINK, "https://google.com"),
+        ]
+
+        self.assertEqual(result, expected)
+
+    def test_empty_input(self):
+        result = split_nodes_link([])
+
+        self.assertEqual(result, [])
+
+    def test_split_images(self):
+        node = TextNode(
+            "This is text with an ![image](https://i.imgur.com/zjjcJKZ.png) and another ![second image](https://i.imgur.com/3elNhQu.png)",
+            TextType.TEXT,
+        )
+        new_nodes = split_nodes_image([node])
+        self.assertListEqual(
+            [
+                TextNode("This is text with an ", TextType.TEXT),
+                TextNode("image", TextType.IMAGE, "https://i.imgur.com/zjjcJKZ.png"),
+                TextNode(" and another ", TextType.TEXT),
+                TextNode(
+                    "second image", TextType.IMAGE, "https://i.imgur.com/3elNhQu.png"
+                ),
+            ],
+            new_nodes,
+        )
+
+    def test_split_links(self):
+        node = TextNode(
+            "This is text with a [link](https://boot.dev) and [another link](https://wikipedia.org) with text that follows",
+            TextType.TEXT,
+        )
+        new_nodes = split_nodes_link([node])
+        self.assertListEqual(
+            [
+                TextNode("This is text with a ", TextType.TEXT),
+                TextNode("link", TextType.LINK, "https://boot.dev"),
+                TextNode(" and ", TextType.TEXT),
+                TextNode("another link", TextType.LINK, "https://wikipedia.org"),
+                TextNode(" with text that follows", TextType.TEXT),
+            ],
+            new_nodes,
+        )
+
+    def test_identical_images(self):
+        node = TextNode(
+            "![cat](cat.png) and ![cat](cat.png)",
+            TextType.TEXT,
+        )
+
+        result = split_nodes_image([node])
+
+        expected = [
+            TextNode("cat", TextType.IMAGE, "cat.png"),
+            TextNode(" and ", TextType.TEXT),
+            TextNode("cat", TextType.IMAGE, "cat.png"),
+        ]
+
+        self.assertEqual(result, expected)
+
+    def test_identical_links(self):
+        node = TextNode(
+            "[Google](https://google.com) and [Google](https://google.com)",
+            TextType.TEXT,
+        )
+
+        result = split_nodes_link([node])
+
+        expected = [
+            TextNode("Google", TextType.LINK, "https://google.com"),
+            TextNode(" and ", TextType.TEXT),
+            TextNode("Google", TextType.LINK, "https://google.com"),
+        ]
+
+        self.assertEqual(result, expected)
 
 
 if __name__ == "__main__":
