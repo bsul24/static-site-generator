@@ -2,25 +2,27 @@ import os
 import shutil
 
 
-def copy_contents_of_dir(src: str, dest: str) -> None:
-    if not os.path.exists(src) or not os.path.exists(dest):
-        raise ValueError("Source and destination must be valid directories")
+def copy_static(src: str, dest: str) -> None:
+    if not os.path.isdir(src):
+        raise ValueError("Source must be a valid directory")
 
-    shutil.rmtree(dest)
+    if os.path.exists(dest):
+        shutil.rmtree(dest)
 
     os.mkdir(dest)
-    contents = os.listdir(src)
 
-    for item in contents:
-        if os.path.isfile(os.path.join(src, item)):
-            shutil.copy(os.path.join(src, item), os.path.join(dest, item))
+    for item in os.listdir(src):
+        src_path = os.path.join(src, item)
+        dest_path = os.path.join(dest, item)
+
+        if os.path.isfile(src_path):
+            shutil.copy(src_path, dest_path)
         else:
-            os.mkdir(os.path.join(dest, item))
-            copy_contents_of_dir(os.path.join(src, item), os.path.join(dest, item))
+            copy_static(src_path, dest_path)
 
 
 def main():
-    copy_contents_of_dir("static", "public")
+    copy_static("static", "public")
 
 
 if __name__ == "__main__":
