@@ -1,5 +1,4 @@
 import unittest
-from textwrap import dedent
 
 from block_markdown import (
     BlockType,
