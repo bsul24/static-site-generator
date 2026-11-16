@@ -1,6 +1,12 @@
 import unittest
+from textwrap import dedent
 
-from block_markdown import BlockType, block_to_block_type, markdown_to_blocks
+from block_markdown import (
+    BlockType,
+    block_to_block_type,
+    markdown_to_blocks,
+    markdown_to_html_node,
+)
 
 
 class TestMarkdownToBlocks(unittest.TestCase):
@@ -514,6 +520,414 @@ This is the third line."""
         self.assertEqual(block_to_block_type(block), BlockType.ORDERED_LIST)
         block = "paragraph"
         self.assertEqual(block_to_block_type(block), BlockType.PARAGRAPH)
+
+
+class TestMarkdownToHTMLNode(unittest.TestCase):
+    # -------------------------
+    # Paragraphs
+    # -------------------------
+
+    def test_paragraph(self):
+        md = "This is a simple paragraph."
+
+        expected = "<div><p>This is a simple paragraph.</p></div>"
+
+        self.assertEqual(
+            markdown_to_html_node(md).to_html(),
+            expected,
+        )
+
+    def test_paragraph_with_inline_formatting(self):
+        md = "This has **bold**, _italic_, and `code` text."
+
+        expected = (
+            "<div><p>"
+            "This has <b>bold</b>, <i>italic</i>, "
+            "and <code>code</code> text."
+            "</p></div>"
+        )
+
+        self.assertEqual(
+            markdown_to_html_node(md).to_html(),
+            expected,
+        )
+
+    def test_paragraph_with_link(self):
+        md = "Visit [Boot.dev](https://boot.dev) today."
+
+        expected = (
+            '<div><p>Visit <a href="https://boot.dev">Boot.dev</a> today.</p></div>'
+        )
+
+        self.assertEqual(
+            markdown_to_html_node(md).to_html(),
+            expected,
+        )
+
+    def test_paragraph_with_image(self):
+        md = "Here is ![a cat](cat.png)."
+
+        expected = '<div><p>Here is <img src="cat.png" alt="a cat"></img>.</p></div>'
+
+        self.assertEqual(
+            markdown_to_html_node(md).to_html(),
+            expected,
+        )
+
+    # -------------------------
+    # Headings
+    # -------------------------
+
+    def test_all_heading_levels(self):
+        for level in range(1, 7):
+            md = "#" * level + " Heading"
+
+            expected = f"<div><h{level}>Heading</h{level}></div>"
+
+            with self.subTest(level=level):
+                self.assertEqual(
+                    markdown_to_html_node(md).to_html(),
+                    expected,
+                )
+
+    def test_heading_with_inline_formatting(self):
+        md = "## A **bold** heading"
+
+        expected = "<div><h2>A <b>bold</b> heading</h2></div>"
+
+        self.assertEqual(
+            markdown_to_html_node(md).to_html(),
+            expected,
+        )
+
+    # -------------------------
+    # Code blocks
+    # -------------------------
+
+    def test_code_block(self):
+        md = "```\nprint('Hello, world!')\n```"
+
+        expected = "<div><pre><code>print('Hello, world!')\n</code></pre></div>"
+
+        self.assertEqual(
+            markdown_to_html_node(md).to_html(),
+            expected,
+        )
+
+    def test_multiline_code_block(self):
+        md = "```\ndef hello():\n    print('Hello!')\n\nhello()\n```"
+
+        expected = (
+            "<div><pre><code>"
+            "def hello():\n"
+            "    print('Hello!')\n"
+            "\n"
+            "hello()\n"
+            "</code></pre></div>"
+        )
+
+        self.assertEqual(
+            markdown_to_html_node(md).to_html(),
+            expected,
+        )
+
+    def test_code_block_preserves_markdown(self):
+        md = "```\nThis is **not bold**.\nThis is _not italic_.\n```"
+
+        expected = (
+            "<div><pre><code>"
+            "This is **not bold**.\n"
+            "This is _not italic_.\n"
+            "</code></pre></div>"
+        )
+
+        self.assertEqual(
+            markdown_to_html_node(md).to_html(),
+            expected,
+        )
+
+    def test_code_block_preserves_indentation(self):
+        md = "```\n    indented line\n        more indentation\n```"
+
+        expected = (
+            "<div><pre><code>"
+            "    indented line\n"
+            "        more indentation\n"
+            "</code></pre></div>"
+        )
+
+        self.assertEqual(
+            markdown_to_html_node(md).to_html(),
+            expected,
+        )
+
+    # -------------------------
+    # Blockquotes
+    # -------------------------
+
+    def test_single_line_quote(self):
+        md = "> This is a quote."
+
+        expected = "<div><blockquote>This is a quote.</blockquote></div>"
+
+        self.assertEqual(
+            markdown_to_html_node(md).to_html(),
+            expected,
+        )
+
+    def test_quote_without_space(self):
+        md = ">This is a quote."
+
+        expected = "<div><blockquote>This is a quote.</blockquote></div>"
+
+        self.assertEqual(
+            markdown_to_html_node(md).to_html(),
+            expected,
+        )
+
+    def test_multiline_quote(self):
+        md = "> First line\n> Second line\n> Third line"
+
+        html = markdown_to_html_node(md).to_html()
+
+        self.assertTrue(html.startswith("<div><blockquote>"))
+        self.assertTrue(html.endswith("</blockquote></div>"))
+
+        # All lines should be present and in order.
+        first = html.index("First line")
+        second = html.index("Second line")
+        third = html.index("Third line")
+
+        self.assertLess(first, second)
+        self.assertLess(second, third)
+
+        # Markdown quote markers should be removed.
+        self.assertNotIn("> First line", html)
+        self.assertNotIn("> Second line", html)
+
+    # -------------------------
+    # Unordered lists
+    # -------------------------
+
+    def test_unordered_list(self):
+        md = "- First item\n- Second item\n- Third item"
+
+        expected = (
+            "<div><ul>"
+            "<li>First item</li>"
+            "<li>Second item</li>"
+            "<li>Third item</li>"
+            "</ul></div>"
+        )
+
+        self.assertEqual(
+            markdown_to_html_node(md).to_html(),
+            expected,
+        )
+
+    def test_unordered_list_with_inline_formatting(self):
+        md = "- **Bold item**\n- _Italic item_\n- Normal item"
+
+        expected = (
+            "<div><ul>"
+            "<li><b>Bold item</b></li>"
+            "<li><i>Italic item</i></li>"
+            "<li>Normal item</li>"
+            "</ul></div>"
+        )
+
+        self.assertEqual(
+            markdown_to_html_node(md).to_html(),
+            expected,
+        )
+
+    # -------------------------
+    # Ordered lists
+    # -------------------------
+
+    def test_ordered_list(self):
+        md = "1. First item\n2. Second item\n3. Third item"
+
+        expected = (
+            "<div><ol>"
+            "<li>First item</li>"
+            "<li>Second item</li>"
+            "<li>Third item</li>"
+            "</ol></div>"
+        )
+
+        self.assertEqual(
+            markdown_to_html_node(md).to_html(),
+            expected,
+        )
+
+    def test_ordered_list_with_double_digits(self):
+        md = "\n".join(f"{i}. Item {i}" for i in range(1, 13))
+
+        expected_items = "".join(f"<li>Item {i}</li>" for i in range(1, 13))
+
+        expected = f"<div><ol>{expected_items}</ol></div>"
+
+        self.assertEqual(
+            markdown_to_html_node(md).to_html(),
+            expected,
+        )
+
+    def test_ordered_list_with_inline_formatting(self):
+        md = "1. First **bold** item\n2. Second _italic_ item"
+
+        expected = (
+            "<div><ol>"
+            "<li>First <b>bold</b> item</li>"
+            "<li>Second <i>italic</i> item</li>"
+            "</ol></div>"
+        )
+
+        self.assertEqual(
+            markdown_to_html_node(md).to_html(),
+            expected,
+        )
+
+    # -------------------------
+    # Multiple blocks
+    # -------------------------
+
+    def test_multiple_paragraphs(self):
+        md = "First paragraph.\n\nSecond paragraph.\n\nThird paragraph."
+
+        expected = (
+            "<div>"
+            "<p>First paragraph.</p>"
+            "<p>Second paragraph.</p>"
+            "<p>Third paragraph.</p>"
+            "</div>"
+        )
+
+        self.assertEqual(
+            markdown_to_html_node(md).to_html(),
+            expected,
+        )
+
+    def test_mixed_block_types(self):
+        md = (
+            "# My Document\n\n"
+            "This is a **paragraph**.\n\n"
+            "- First item\n"
+            "- Second item\n\n"
+            "> A quote\n\n"
+            "1. First\n"
+            "2. Second"
+        )
+
+        expected = (
+            "<div>"
+            "<h1>My Document</h1>"
+            "<p>This is a <b>paragraph</b>.</p>"
+            "<ul>"
+            "<li>First item</li>"
+            "<li>Second item</li>"
+            "</ul>"
+            "<blockquote>A quote</blockquote>"
+            "<ol>"
+            "<li>First</li>"
+            "<li>Second</li>"
+            "</ol>"
+            "</div>"
+        )
+
+        self.assertEqual(
+            markdown_to_html_node(md).to_html(),
+            expected,
+        )
+
+    def test_code_block_followed_by_paragraph(self):
+        md = "```\nprint('hello')\n```\n\nThis is a paragraph."
+
+        expected = (
+            "<div>"
+            "<pre><code>print('hello')\n</code></pre>"
+            "<p>This is a paragraph.</p>"
+            "</div>"
+        )
+
+        self.assertEqual(
+            markdown_to_html_node(md).to_html(),
+            expected,
+        )
+
+    def test_extra_blank_lines_between_blocks(self):
+        md = "# Heading\n\n\n\nA paragraph.\n\n\n- One\n- Two"
+
+        expected = (
+            "<div>"
+            "<h1>Heading</h1>"
+            "<p>A paragraph.</p>"
+            "<ul><li>One</li><li>Two</li></ul>"
+            "</div>"
+        )
+
+        self.assertEqual(
+            markdown_to_html_node(md).to_html(),
+            expected,
+        )
+
+    def test_empty_blockquote(self):
+        md = ">"
+
+        expected = "<div><blockquote></blockquote></div>"
+
+        self.assertEqual(
+            markdown_to_html_node(md).to_html(),
+            expected,
+        )
+
+    def test_code_block_with_blank_lines(self):
+        md = "```\ndef hello():\n    print('Hello')\n\nhello()\n```"
+
+        self.assertEqual(
+            markdown_to_blocks(md),
+            [md],
+        )
+
+    def test_backticks_inside_paragraph(self):
+        md = "Some text containing ``` characters.\n\nAnother paragraph."
+
+        self.assertEqual(
+            markdown_to_blocks(md),
+            [
+                "Some text containing ``` characters.",
+                "Another paragraph.",
+            ],
+        )
+
+    def test_preserve_code_indentation(self):
+        md = "```\n    first line\n\n        second line\n```"
+
+        self.assertEqual(
+            markdown_to_blocks(md),
+            [md],
+        )
+
+    def test_multiple_code_blocks(self):
+        first = "```\nfirst()\n```"
+        second = "```\nsecond()\n```"
+
+        md = f"{first}\n\nA paragraph.\n\n{second}"
+
+        self.assertEqual(
+            markdown_to_blocks(md),
+            [
+                first,
+                "A paragraph.",
+                second,
+            ],
+        )
+
+    def test_unclosed_code_block(self):
+        md = "```\nprint('hello')"
+
+        with self.assertRaises(ValueError):
+            markdown_to_blocks(md)
 
 
 if __name__ == "__main__":
